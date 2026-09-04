@@ -18,6 +18,7 @@ gh secret set ORG_ADMIN_TOKEN --repo Kumbhathon-Innovation-Foundation/register
 ## 3. Labels  ✅ done
 
 ```
+gh label create registration -R Kumbhathon-Innovation-Foundation/register -c ededed -d "A team registration request"
 gh label create approved   -R Kumbhathon-Innovation-Foundation/register -c 2ea44f -d "Organiser approved - bot creates the repo"
 gh label create registered -R Kumbhathon-Innovation-Foundation/register -c 0e8a16 -d "Repo created"
 gh label create ready      -R Kumbhathon-Innovation-Foundation/register -c fbca04 -d "Passed checks, awaiting approval"
