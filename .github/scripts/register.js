@@ -1,10 +1,12 @@
 // Kumbhathon SPRINT registration bot.
-// Runs inside actions/github-script. Two entrypoints:
-//   validate() - default GITHUB_TOKEN, comments a check result on new/edited issues
-//   register() - ORG_ADMIN_TOKEN, fires when an organiser adds the `approved` label:
-//                creates a private team repo, seeds it, adds every member as admin.
-// Teams are added as repo collaborators (outside collaborators) so each team can see
-// ONLY its own repo. No org membership, no base-permission change required.
+// Runs inside actions/github-script, on issue opened/edited, with ORG_ADMIN_TOKEN.
+// No approval gate: a valid submission immediately gets a private team repo, seeded,
+// with every listed member added as admin (outside collaborators -> each team sees only
+// its own repo). Invalid submissions get a `needs-fix` comment and are retried on edit.
+//
+// ponytail: gate removed on request. Anyone can open an issue -> anyone can trigger a repo
+// create. If spam appears, re-add an `if` on an `approved` label (see git history) or delete
+// junk issues/repos manually.
 
 const fs = require('fs')
 const path = require('path')
@@ -77,72 +79,49 @@ async function comment(github, context, body) {
     issue_number: context.payload.issue.number, body,
   })
 }
-async function addLabel(github, context, name) {
-  await github.rest.issues.addLabels({
-    owner: context.repo.owner, repo: context.repo.repo,
-    issue_number: context.payload.issue.number, labels: [name],
-  }).catch(() => {})
+async function setLabels(github, context, add = [], remove = []) {
+  for (const name of add) {
+    await github.rest.issues.addLabels({
+      owner: context.repo.owner, repo: context.repo.repo,
+      issue_number: context.payload.issue.number, labels: [name],
+    }).catch(() => {})
+  }
+  for (const name of remove) {
+    await github.rest.issues.removeLabel({
+      owner: context.repo.owner, repo: context.repo.repo,
+      issue_number: context.payload.issue.number, name,
+    }).catch(() => {})
+  }
 }
 
-async function validate({ github, context }) {
-  const issue = context.payload.issue
-  if ((issue.labels || []).some(l => l.name === 'registered')) return
-
-  const { team, project, members } = parseIssue(issue.body || '')
-  const tower = towerOf(issue)
-  const problems = []
-  if (!team) problems.push('Team name is empty.')
-  if (!tower) problems.push('Tower label missing - register through a tower link, not a blank issue.')
-  if (!project) problems.push('Project title is empty.')
-  if (members.length < 1) problems.push('List at least one valid GitHub username.')
-  if (members.length > MAX_MEMBERS) problems.push(`Too many members listed (max ${MAX_MEMBERS}).`)
-  const bad = members.length && members.length <= MAX_MEMBERS ? await badUsers(github, members) : []
-  if (bad.length) problems.push(`GitHub users not found: ${bad.map(u => '`' + u + '`').join(', ')}`)
-
-  if (problems.length) {
-    await comment(github, context, `**Not ready yet.** Edit the issue to fix:\n\n${problems.map(p => '- ' + p).join('\n')}`)
-    await addLabel(github, context, 'needs-fix')
-    return
-  }
-  await comment(github, context,
-    `**Ready for approval.**\n\n` +
-    `| field | value |\n|--|--|\n` +
-    `| Team | ${clean(team)} |\n` +
-    `| Tower | ${tower} - ${TOWERS[tower].name} |\n` +
-    `| Project | ${clean(project)} |\n` +
-    `| Members | ${members.map(m => '@' + m).join(', ')} |\n` +
-    `| Repo | \`${ORG}/${repoName(issue)}\` |\n\n` +
-    `Organiser: add the **\`approved\`** label to create the repo.`)
-  await addLabel(github, context, 'ready')
+async function reject(github, context, msg) {
+  await comment(github, context, `**Not registered yet.** ${msg}\n\nEdit the issue above to fix it — the bot retries automatically when you save.`)
+  await setLabels(github, context, ['needs-fix'])
 }
 
 async function register({ github, context }) {
   const issue = context.payload.issue
-  if ((issue.labels || []).some(l => l.name === 'registered')) {
-    await comment(github, context, 'Already registered - skipping.')
-    return
-  }
+  if ((issue.labels || []).some(l => (l.name || l) === 'registered')) return // already done
+
   const { team, project, members } = parseIssue(issue.body || '')
   const tower = towerOf(issue)
   const t = TOWERS[tower]
-  if (!t || !team || !members.length) {
-    await comment(github, context, 'Cannot register: team, tower, or members missing/invalid. Fix the issue, then remove and re-add the `approved` label.')
-    await addLabel(github, context, 'needs-fix')
-    return
-  }
+
+  const problems = []
+  if (!t) problems.push('tower label missing — open a tower link, not a blank issue.')
+  if (!team) problems.push('team name is empty.')
+  if (!project) problems.push('project title is empty.')
+  if (!members.length) problems.push('list at least one valid GitHub username.')
+  if (members.length > MAX_MEMBERS) problems.push(`too many members (max ${MAX_MEMBERS}).`)
+  if (problems.length) return reject(github, context, problems.join(' '))
+
   const bad = await badUsers(github, members)
-  if (bad.length) {
-    await comment(github, context, `Cannot register: GitHub users not found: ${bad.map(u => '`' + u + '`').join(', ')}. Fix and re-approve.`)
-    await addLabel(github, context, 'needs-fix')
-    return
-  }
+  if (bad.length) return reject(github, context, `GitHub users not found: ${bad.map(u => '`' + u + '`').join(', ')}.`)
 
   const repo = repoName(issue)
   try {
     await github.rest.repos.get({ owner: ORG, repo })
-    await comment(github, context, `Repo \`${ORG}/${repo}\` already exists. Rename the team or remove the old repo, then re-approve.`)
-    await addLabel(github, context, 'needs-fix')
-    return
+    return reject(github, context, `repo \`${ORG}/${repo}\` already exists — rename the team.`)
   } catch (e) { if (e.status !== 404) throw e }
 
   await github.rest.repos.createInOrg({
@@ -178,12 +157,11 @@ async function register({ github, context }) {
     (ok.length ? `Invited as admin: ${ok.map(u => '@' + u).join(', ')}\n_Check your GitHub notifications and accept the repo invite._\n\n` : '') +
     (failed.length ? `:warning: Could not invite: ${failed.join(', ')} - an organiser will add these by hand.\n\n` : '') +
     `Next: open \`SUBMISSION.md\` in the repo and follow it.`)
-  await github.rest.issues.addLabels({ owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number, labels: ['registered'] })
+  await setLabels(github, context, ['registered'], ['needs-fix'])
   await github.rest.issues.update({ owner: context.repo.owner, repo: context.repo.repo, issue_number: issue.number, state: 'closed' })
 }
 
 module.exports = register
-module.exports.validate = validate
 module.exports.register = register
 module.exports.parseIssue = parseIssue
 module.exports.towerOf = towerOf

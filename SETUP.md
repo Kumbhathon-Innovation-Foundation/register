@@ -1,7 +1,9 @@
 # Setup
 
 One-time, by an organisation owner of `Kumbhathon-Innovation-Foundation`.
-Status as of go-live: 1-3 and 6 done, 5 done (repo is public). Remaining: 4.
+Status: 1, 2, 3, 5, 6 done. Step 4 (extra organisers) is optional.
+
+There is **no approval gate** — a valid submission auto-creates the team repo.
 
 ## 1. Bot token  ✅ done
 
@@ -19,9 +21,7 @@ gh secret set ORG_ADMIN_TOKEN --repo Kumbhathon-Innovation-Foundation/register
 
 ```
 gh label create registration -R Kumbhathon-Innovation-Foundation/register -c ededed -d "A team registration request"
-gh label create approved   -R Kumbhathon-Innovation-Foundation/register -c 2ea44f -d "Organiser approved - bot creates the repo"
 gh label create registered -R Kumbhathon-Innovation-Foundation/register -c 0e8a16 -d "Repo created"
-gh label create ready      -R Kumbhathon-Innovation-Foundation/register -c fbca04 -d "Passed checks, awaiting approval"
 gh label create needs-fix  -R Kumbhathon-Innovation-Foundation/register -c d93f0b -d "Registration has a problem"
 gh label create tower-1 -R Kumbhathon-Innovation-Foundation/register -c 1d76db -d "Tower 1 - Crowd Control"
 gh label create tower-2 -R Kumbhathon-Innovation-Foundation/register -c 1d76db -d "Tower 2 - Hardware / IoT"
@@ -32,9 +32,10 @@ gh label create tower-4 -R Kumbhathon-Innovation-Foundation/register -c 1d76db -
 The `tower-N` labels must exist or the issue templates cannot self-apply them, and the bot
 reads the tower from that label.
 
-## 4. Let other organisers approve  ← TODO
+## 4. Extra organisers (optional)
 
-They need **write** (or triage) on this repo to add the `approved` label.
+Nobody needs to approve anything. Add helpers only so they can watch submissions, close junk
+issues, and add collaborators to team repos — give them **write** on this repo:
 
 ```
 gh api -X POST orgs/Kumbhathon-Innovation-Foundation/teams -f name=organisers -f privacy=closed
@@ -67,10 +68,13 @@ Put these in the participant guidelines (one per tower):
 
 ## How it runs
 
-| Trigger | Token | Action |
-|--|--|--|
-| Issue opened / edited | `GITHUB_TOKEN` | Validate fields + usernames, post a check comment, label `ready` or `needs-fix` |
-| `approved` label added | `ORG_ADMIN_TOKEN` | Create private `t<N>-<team>`, seed files, tag topic `tower-N`, add members as admin, close issue |
+On **issue opened / edited**, one job runs with `ORG_ADMIN_TOKEN`:
+- Invalid (missing field, bad username, dup repo) -> comments the reason, labels `needs-fix`, stops.
+  Retries automatically when the team edits the issue.
+- Valid -> creates private `t<N>-<team>`, seeds `README.md` + `SUBMISSION.md`, tags topic
+  `tower-N`, adds every member as repo admin, labels `registered`, closes the issue.
 
-Tower is taken from the `tower-N` label the template applies. Only users with write/triage can
-add labels, so participants cannot trigger the privileged job.
+Tower is taken from the `tower-N` label the per-tower template applies.
+
+**No approval gate** — anyone who can open an issue triggers a repo create. To re-add a gate if
+spam appears, see the note in `RUNBOOK.md`.

@@ -2,26 +2,18 @@ name: Register project
 
 on:
   issues:
-    types: [opened, edited, labeled]
+    types: [opened, edited]
 
 permissions:
   issues: write
   contents: read
 
-jobs:
-  validate:
-    if: github.event.action == 'opened' || github.event.action == 'edited'
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/github-script@v7
-        with:
-          script: |
-            const m = require('./.github/scripts/register.js')
-            await m.validate({ github, context, core })
+concurrency:
+  group: register-${{ github.event.issue.number }}
+  cancel-in-progress: false
 
+jobs:
   register:
-    if: github.event.action == 'labeled' && github.event.label.name == 'approved'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

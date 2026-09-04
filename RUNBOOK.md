@@ -22,35 +22,34 @@ The link locks the tower — a team can't pick the wrong one.
 3. Fill in: **Team name**, **Project title**, **GitHub usernames of ALL members** (one per line,
    include yourself), tick the acknowledgement box.
 4. Click **Create**.
-5. Within ~30 sec the bot comments:
-   - **"Not ready yet"** + list -> click the pencil, edit the issue, fix, save. Bot re-checks.
-   - **"Ready for approval"** -> wait for an organiser.
-6. Organiser approves. Bot comments **"Registered"** with the private repo link and closes the issue.
-7. **Every listed member** gets an email + GitHub notification "invited to collaborate" ->
+5. Within ~30 sec the bot either:
+   - comments **"### Registered"** with the private repo link and closes the issue — done; or
+   - comments **"Not registered yet"** + reason -> click the pencil, fix the issue, save. The bot
+     retries automatically on every save.
+6. **Every listed member** gets an email + GitHub notification "invited to collaborate" ->
    each opens it and clicks **Accept invitation**.
-8. Clone the repo, open `SUBMISSION.md`, build, push to `main` before the deadline.
+7. Clone the repo, open `SUBMISSION.md`, build, push to `main` before the deadline.
 
-Non-captain members only do step 7.
+Non-captain members only do step 6.
 
-## Organiser flow (per registration)
+## Organiser flow
 
-1. A new issue appears in this repo. Watch -> Issues to get notified.
-2. Open it, read the bot's check comment.
-3. **"Not ready yet"** -> leave it; the team edits and the bot re-checks.
-4. **"Ready for approval"** -> sanity-check: real team, tower correct, usernames plausible,
-   not a duplicate.
-5. Approve: right sidebar -> **Labels** -> click **`approved`**.
-6. Bot creates `t<N>-<team>`, seeds it, invites members as admin, closes the issue (~30 sec).
-7. Bot posts an **error** instead ("repo already exists", "could not invite X", ...) -> fix per
-   the message, then **remove** the `approved` label and **add it again** to retry.
+There is **no approval step** — a valid submission creates the repo automatically. You only:
+
+1. Watch -> Issues to keep an eye on submissions.
+2. Ignore issues that self-resolve (bot closes them with a repo link).
+3. Help teams stuck on a **"Not registered yet"** comment (usual cause: a mistyped username).
+4. Close / delete any spam or duplicate junk issues (needs Write on the repo).
+5. If the bot reports **"Could not invite X"**, add that person to the team repo by hand:
+   repo -> Settings -> Collaborators -> Add -> role **Admin**.
 
 You never create a team repo by hand.
 
 ## Adding other organisers / admins
 
-### Registration approver (default — least privilege)
+### Helper (default — least privilege)
 
-Can approve registrations, nothing else.
+Can watch submissions, close junk issues, add collaborators to team repos. Cannot change org settings.
 
 Web: Org -> **Teams** -> New team `organisers` (once) -> its **Repositories** tab -> add
 `register` with **Write** (once) -> its **Members** tab -> add the person. They accept the org
@@ -79,3 +78,6 @@ gh api -X PUT orgs/Kumbhathon-Innovation-Foundation/memberships/USERNAME -f role
 - **Browse all submissions:** org Repositories, filter by topic `tower-1` ... `tower-4`.
 - **Deadline:** judging uses whatever is on each repo's `main` at the deadline.
 - Duplicate team name in the same tower -> bot refuses, tells the team to rename.
+- **Turn approval back on** (if spam appears): in `.github/workflows/register.yml` add
+  `if: github.event.action == 'labeled' && github.event.label.name == 'approved'` to the
+  `register` job and switch `on.issues.types` to `[labeled]`; recreate the `approved` label.

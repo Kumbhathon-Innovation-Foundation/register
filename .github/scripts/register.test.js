@@ -1,6 +1,7 @@
 // node .github/scripts/register.test.js  -- no framework, exits non-zero on failure
 const assert = require('assert')
-const { parseIssue, towerOf, teamSlug, repoName } = require('./register.js')
+const { parseIssue, towerOf, teamSlug, repoName, register } = require('./register.js')
+assert.strictEqual(typeof register, 'function')
 
 const body = `### Team name
 

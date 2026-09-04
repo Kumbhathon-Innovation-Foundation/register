@@ -8,8 +8,9 @@ body:
       value: |
         Registering under **Tower 4 - Pilgrim Experience**. Wrong tower? Close this and open the correct link.
 
-        One submission per team. A bot checks it, an organiser approves, then every listed
-        member is added as **admin** on a new **private** team repo.
+        One submission per team. When you submit, a bot checks it and — if valid — immediately
+        creates a **private** team repo with every listed member added as **admin**. If something
+        is wrong it comments why; just edit this issue to fix it and the bot retries.
   - type: input
     id: team
     attributes:
