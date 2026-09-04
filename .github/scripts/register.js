@@ -32,7 +32,6 @@ function field(body, label) {
 
 function parseIssue(body) {
   const team = field(body, 'Team name')
-  const tower = (field(body, 'Tower').match(/[1-4]/) || [])[0] || ''
   const project = field(body, 'Project title')
   const members = [...new Set(
     field(body, 'GitHub usernames of ALL team members')
@@ -40,15 +39,25 @@ function parseIssue(body) {
       .map(s => s.trim().replace(/^[-*]\s+/, '').replace(/^@/, ''))
       .filter(s => USER_RE.test(s))
   )]
-  return { team, tower, project, members }
+  return { team, project, members }
+}
+
+// Tower comes from the per-tower issue template's label (tower-1..tower-4).
+// Falls back to a "Tower" body field if a generic template is ever used.
+function towerOf(issue) {
+  for (const l of issue.labels || []) {
+    const m = /^tower-([1-4])$/.exec(typeof l === 'string' ? l : l.name || '')
+    if (m) return m[1]
+  }
+  return (field(issue.body || '', 'Tower').match(/[1-4]/) || [])[0] || ''
 }
 
 const teamSlug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40)
 
 function repoName(issue) {
-  const { team, tower } = parseIssue(issue.body || '')
+  const { team } = parseIssue(issue.body || '')
   const slug = teamSlug(team) || `team-${issue.number}`
-  return `t${tower}-${slug}`
+  return `t${towerOf(issue)}-${slug}`
 }
 
 async function badUsers(github, members) {
@@ -79,10 +88,11 @@ async function validate({ github, context }) {
   const issue = context.payload.issue
   if ((issue.labels || []).some(l => l.name === 'registered')) return
 
-  const { team, tower, project, members } = parseIssue(issue.body || '')
+  const { team, project, members } = parseIssue(issue.body || '')
+  const tower = towerOf(issue)
   const problems = []
   if (!team) problems.push('Team name is empty.')
-  if (!tower) problems.push('Tower is not set to 1-4.')
+  if (!tower) problems.push('Tower label missing - register through a tower link, not a blank issue.')
   if (!project) problems.push('Project title is empty.')
   if (members.length < 1) problems.push('List at least one valid GitHub username.')
   if (members.length > MAX_MEMBERS) problems.push(`Too many members listed (max ${MAX_MEMBERS}).`)
@@ -112,7 +122,8 @@ async function register({ github, context }) {
     await comment(github, context, 'Already registered - skipping.')
     return
   }
-  const { team, tower, project, members } = parseIssue(issue.body || '')
+  const { team, project, members } = parseIssue(issue.body || '')
+  const tower = towerOf(issue)
   const t = TOWERS[tower]
   if (!t || !team || !members.length) {
     await comment(github, context, 'Cannot register: team, tower, or members missing/invalid. Fix the issue, then remove and re-add the `approved` label.')
@@ -175,5 +186,6 @@ module.exports = register
 module.exports.validate = validate
 module.exports.register = register
 module.exports.parseIssue = parseIssue
+module.exports.towerOf = towerOf
 module.exports.teamSlug = teamSlug
 module.exports.repoName = repoName

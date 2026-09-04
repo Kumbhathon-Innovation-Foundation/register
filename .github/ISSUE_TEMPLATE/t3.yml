@@ -1,0 +1,43 @@
+name: Register - Tower 3 (Information Analysis)
+description: Register your team under Tower 3 - Information Analysis
+title: "[Register] Tower 3: "
+labels: ["registration", "tower-3"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Registering under **Tower 3 - Information Analysis**. Wrong tower? Close this and open the correct link.
+
+        One submission per team. A bot checks it, an organiser approves, then every listed
+        member is added as **admin** on a new **private** team repo.
+  - type: input
+    id: team
+    attributes:
+      label: Team name
+      placeholder: Nashik Navigators
+    validations:
+      required: true
+  - type: input
+    id: project
+    attributes:
+      label: Project title
+      placeholder: Real-time ghat density map
+    validations:
+      required: true
+  - type: textarea
+    id: members
+    attributes:
+      label: GitHub usernames of ALL team members
+      description: One per line or comma-separated. Include yourself. These exact accounts get admin on the repo.
+      placeholder: |
+        octocat
+        torvalds
+    validations:
+      required: true
+  - type: checkboxes
+    id: ack
+    attributes:
+      label: Acknowledgement
+      options:
+        - label: These usernames are correct and belong to my teammates
+          required: true
