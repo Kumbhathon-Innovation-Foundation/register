@@ -77,4 +77,4 @@ On **issue opened / edited**, one job runs with `ORG_ADMIN_TOKEN`:
 Tower is taken from the `tower-N` label the per-tower template applies.
 
 **No approval gate** — anyone who can open an issue triggers a repo create. To re-add a gate if
-spam appears, see the note in `RUNBOOK.md`.
+spam appears, see "Turn an approval gate back on" in [`README.md`](README.md).
